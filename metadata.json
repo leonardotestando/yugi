@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Duel Monsters",
+  "description": "A simplified trading card game similar to Yu-Gi-Oh! where you play against an AI opponent.",
+  "requestFramePermissions": []
+}
