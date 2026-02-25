@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { Sword, Shield, Sparkles } from 'lucide-react';
 import { Card } from './components/Card';
 import { GameCard, Action, GameState } from './types';
 import { playDrawSound, playSummonSound, playSpellSound, playAttackSound, playDamageSound, playHealSound } from './utils/audio';
@@ -15,6 +16,8 @@ export default function App() {
   const [role, setRole] = useState<'player1' | 'player2' | 'spectator' | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [roomId, setRoomId] = useState('');
+  const [playerName, setPlayerName] = useState('');
+  const [hasJoined, setHasJoined] = useState(false);
   
   const [interaction, setInteraction] = useState<InteractionState>({ type: 'IDLE' });
   const [dragOverZone, setDragOverZone] = useState<{ type: 'MONSTER' | 'SPELL', index: number } | null>(null);
@@ -25,14 +28,23 @@ export default function App() {
   const [prevP2Lp, setPrevP2Lp] = useState(8000);
 
   useEffect(() => {
-    const hash = window.location.hash.slice(1) || 'lobby-principal';
+    let hash = window.location.hash.slice(1);
+    if (!hash) {
+      hash = Math.random().toString(36).substring(2, 9);
+      window.location.hash = hash;
+    }
     setRoomId(hash);
-    window.location.hash = hash;
+  }, []);
 
+  const handleJoin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!playerName.trim()) return;
+
+    setHasJoined(true);
     const newSocket = io();
     setSocket(newSocket);
 
-    newSocket.emit('join', hash);
+    newSocket.emit('join', { roomId, playerName: playerName.trim() });
 
     newSocket.on('role', (assignedRole) => {
       setRole(assignedRole);
@@ -41,11 +53,13 @@ export default function App() {
     newSocket.on('gameState', (newState: GameState) => {
       setState(newState);
     });
+  };
 
+  useEffect(() => {
     return () => {
-      newSocket.close();
+      if (socket) socket.close();
     };
-  }, []);
+  }, [socket]);
 
   useEffect(() => {
     if (!state) return;
@@ -80,7 +94,7 @@ export default function App() {
   }, [state?.player2.lp, prevP2Lp]);
 
   const dispatch = (action: Action) => {
-    if (socket && state && state.turn === role) {
+    if (socket && state && state.turn === role && state.status === 'playing') {
       switch (action.type) {
         case 'DRAW_CARD': playDrawSound(); break;
         case 'SUMMON_MONSTER': playSummonSound(); break;
@@ -91,11 +105,56 @@ export default function App() {
     }
   };
 
+  if (!hasJoined) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-black text-white font-mono bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
+        <div className="bg-zinc-900/80 p-8 border-4 border-blue-900 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.5)] flex flex-col items-center max-w-md w-full mx-4">
+          <h1 className="text-4xl font-bold text-yellow-500 mb-8 text-center tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,1)]">DUEL MONSTERS</h1>
+          
+          <form onSubmit={handleJoin} className="w-full flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <label className="text-blue-400 font-bold uppercase tracking-wider text-sm">Seu Nome</label>
+              <input 
+                type="text" 
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder="Digite seu nome..."
+                className="bg-black border-2 border-zinc-700 p-3 text-white font-bold focus:outline-none focus:border-yellow-500 transition-colors"
+                maxLength={15}
+                required
+              />
+            </div>
+
+            <button 
+              type="submit"
+              className="mt-4 bg-blue-700 hover:bg-blue-600 border-2 border-blue-400 text-white font-bold py-4 text-xl uppercase tracking-widest transition-transform hover:scale-105 active:scale-95"
+            >
+              Entrar no Duelo
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (!state || !role) {
     return (
       <div className="flex flex-col h-screen items-center justify-center bg-black text-white font-mono bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
         <div className="text-2xl mb-4 animate-pulse text-yellow-500">Conectando ao servidor multiplayer...</div>
-        <div className="text-sm text-zinc-400">Sala: {roomId}</div>
+      </div>
+    );
+  }
+
+  if (state.status === 'waiting') {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-black text-white font-mono bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
+        <div className="text-2xl sm:text-3xl mb-6 animate-pulse text-yellow-500 font-bold tracking-widest text-center px-4">Aguardando segundo jogador...</div>
+        <div className="bg-zinc-900/80 p-6 border-2 border-blue-900 rounded-lg flex flex-col items-center gap-4 max-w-lg w-full mx-4 text-center">
+          <span className="text-zinc-400">Compartilhe este link com seu amigo para ele entrar na partida:</span>
+          <div className="bg-black border border-zinc-700 p-3 rounded text-blue-400 font-bold select-all w-full overflow-x-auto whitespace-nowrap">
+            {window.location.href}
+          </div>
+        </div>
       </div>
     );
   }
@@ -292,7 +351,12 @@ export default function App() {
             {/* Spells */}
             <div className="flex justify-center gap-1 sm:gap-2 z-10 mb-1">
               {opponent.spellZone.map((c, i) => (
-                <div key={`p2s${i}`} className="w-14 h-20 sm:w-16 sm:h-24 border-2 border-emerald-900/50 bg-emerald-950/30 flex items-center justify-center">
+                <div key={`p2s${i}`} className="relative w-14 h-20 sm:w-16 sm:h-24 border-2 border-emerald-900/50 bg-emerald-950/30 flex items-center justify-center">
+                  {c && (
+                    <div className="absolute -bottom-2 -left-2 z-30 bg-black/80 rounded-full p-0.5 border border-zinc-600">
+                      <Sparkles size={12} className="text-emerald-400 animate-pulse" />
+                    </div>
+                  )}
                   <Card card={c} />
                 </div>
               ))}
@@ -300,15 +364,23 @@ export default function App() {
             
             {/* Monsters */}
             <div className="flex justify-center gap-1 sm:gap-2 z-10">
-              {opponent.monsterZone.map((c, i) => (
-                <div key={`p2m${i}`} className="w-14 h-20 sm:w-16 sm:h-24 border-2 border-blue-900/50 bg-blue-950/30 flex items-center justify-center">
-                  <Card 
-                    card={c} 
-                    isTargetable={interaction.type === 'SELECTED_ATTACKER' && c !== null}
-                    onClick={() => c && handleOpponentMonsterClick(i)}
-                  />
-                </div>
-              ))}
+              {opponent.monsterZone.map((c, i) => {
+                const isAttack = c?.position === 'ATTACK';
+                return (
+                  <div key={`p2m${i}`} className="relative w-14 h-20 sm:w-16 sm:h-24 border-2 border-blue-900/50 bg-blue-950/30 flex items-center justify-center">
+                    {c && c.position !== 'SET' && (
+                      <div className="absolute -bottom-2 -left-2 z-30 bg-black/80 rounded-full p-0.5 border border-zinc-600">
+                        {isAttack ? <Sword size={12} className="text-red-400" /> : <Shield size={12} className="text-blue-400" />}
+                      </div>
+                    )}
+                    <Card 
+                      card={c} 
+                      isTargetable={interaction.type === 'SELECTED_ATTACKER' && c !== null}
+                      onClick={() => c && handleOpponentMonsterClick(i)}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
           
@@ -324,7 +396,7 @@ export default function App() {
       <div className="absolute top-1/2 left-0 right-0 -translate-y-1/2 flex justify-between items-center px-2 sm:px-8 pointer-events-none z-30">
         {/* Opponent LP */}
         <div className="flex flex-col bg-black/80 border-2 border-zinc-700 p-1 sm:p-2 rounded pointer-events-auto shadow-lg">
-          <span className="text-[8px] sm:text-xs text-yellow-500 font-bold tracking-widest">OPONENTE LP</span>
+          <span className="text-[8px] sm:text-xs text-yellow-500 font-bold tracking-widest uppercase truncate max-w-[100px] sm:max-w-[150px]">{opponent.name} LP</span>
           <span className={`inline-block text-lg sm:text-3xl font-bold font-mono transition-all duration-300 ${oppEffect === 'heal' ? 'text-green-400 scale-125 animate-pulse' : oppEffect === 'damage' ? 'text-red-500 scale-110' : 'text-white'}`}>
             {opponent.lp.toString().padStart(4, '0')}
           </span>
@@ -365,14 +437,14 @@ export default function App() {
               <span className="text-yellow-400 text-[10px] sm:text-xs font-bold animate-pulse uppercase tracking-wider">Compre uma carta!</span>
             )}
             {interaction.type === 'IDLE' && !isMyTurn && (
-              <span className="text-zinc-500 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Turno do Oponente</span>
+              <span className="text-zinc-500 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Turno de {opponent.name}</span>
             )}
           </div>
         </div>
         
         {/* My LP */}
         <div className="flex flex-col items-end bg-black/80 border-2 border-zinc-700 p-1 sm:p-2 rounded pointer-events-auto shadow-lg">
-          <span className="text-[8px] sm:text-xs text-yellow-500 font-bold tracking-widest">MEU LP</span>
+          <span className="text-[8px] sm:text-xs text-yellow-500 font-bold tracking-widest uppercase truncate max-w-[100px] sm:max-w-[150px]">{me.name} LP</span>
           <span className={`inline-block text-lg sm:text-3xl font-bold font-mono transition-all duration-300 ${myEffect === 'heal' ? 'text-green-400 scale-125 animate-pulse' : myEffect === 'damage' ? 'text-red-500 scale-110' : 'text-white'}`}>
             {me.lp.toString().padStart(4, '0')}
           </span>
@@ -391,21 +463,29 @@ export default function App() {
           <div className="flex-1 flex flex-col items-center justify-end h-full">
             {/* Monsters */}
             <div className="flex justify-center gap-1 sm:gap-2 z-10 mb-1">
-              {me.monsterZone.map((c, i) => (
-                <div 
-                  key={`p1m${i}`} 
-                  className={`w-14 h-20 sm:w-16 sm:h-24 border-2 flex items-center justify-center transition-colors ${dragOverZone?.type === 'MONSTER' && dragOverZone?.index === i ? 'border-yellow-400 bg-yellow-400/20' : 'border-blue-900/50 bg-blue-950/30'}`}
-                  onDragOver={(e) => handleDragOver(e, 'MONSTER', i)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, 'MONSTER', i)}
-                >
-                  <Card 
-                    card={c} 
-                    isSelected={interaction.type === 'SELECTED_MONSTER' && interaction.monsterIndex === i || interaction.type === 'SELECTED_ATTACKER' && interaction.monsterIndex === i}
-                    onClick={() => handlePlayerMonsterClick(i)}
-                  />
-                </div>
-              ))}
+              {me.monsterZone.map((c, i) => {
+                const isAttack = c?.position === 'ATTACK';
+                return (
+                  <div 
+                    key={`p1m${i}`} 
+                    className={`relative w-14 h-20 sm:w-16 sm:h-24 border-2 flex items-center justify-center transition-colors ${dragOverZone?.type === 'MONSTER' && dragOverZone?.index === i ? 'border-yellow-400 bg-yellow-400/20' : 'border-blue-900/50 bg-blue-950/30'}`}
+                    onDragOver={(e) => handleDragOver(e, 'MONSTER', i)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, 'MONSTER', i)}
+                  >
+                    {c && (
+                      <div className="absolute -top-2 -right-2 z-30 bg-black/80 rounded-full p-0.5 border border-zinc-600">
+                        {isAttack ? <Sword size={12} className="text-red-400" /> : <Shield size={12} className="text-blue-400" />}
+                      </div>
+                    )}
+                    <Card 
+                      card={c} 
+                      isSelected={interaction.type === 'SELECTED_MONSTER' && interaction.monsterIndex === i || interaction.type === 'SELECTED_ATTACKER' && interaction.monsterIndex === i}
+                      onClick={() => handlePlayerMonsterClick(i)}
+                    />
+                  </div>
+                );
+              })}
             </div>
             
             {/* Spells */}
@@ -413,11 +493,16 @@ export default function App() {
               {me.spellZone.map((c, i) => (
                 <div 
                   key={`p1s${i}`} 
-                  className={`w-14 h-20 sm:w-16 sm:h-24 border-2 flex items-center justify-center transition-colors ${dragOverZone?.type === 'SPELL' && dragOverZone?.index === i ? 'border-yellow-400 bg-yellow-400/20' : 'border-emerald-900/50 bg-emerald-950/30'}`}
+                  className={`relative w-14 h-20 sm:w-16 sm:h-24 border-2 flex items-center justify-center transition-colors ${dragOverZone?.type === 'SPELL' && dragOverZone?.index === i ? 'border-yellow-400 bg-yellow-400/20' : 'border-emerald-900/50 bg-emerald-950/30'}`}
                   onDragOver={(e) => handleDragOver(e, 'SPELL', i)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, 'SPELL', i)}
                 >
+                  {c && (
+                    <div className="absolute -top-2 -right-2 z-30 bg-black/80 rounded-full p-0.5 border border-zinc-600">
+                      <Sparkles size={12} className="text-emerald-400 animate-pulse" />
+                    </div>
+                  )}
                   <Card card={c} />
                 </div>
               ))}

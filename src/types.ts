@@ -21,6 +21,7 @@ export interface GameCard extends CardTemplate {
 }
 
 export interface PlayerState {
+  name: string;
   lp: number;
   deck: GameCard[];
   hand: GameCard[];
@@ -38,6 +39,7 @@ export interface GameState {
   turnCount: number;
   log: string[];
   winner: 'player1' | 'player2' | null;
+  status: 'waiting' | 'playing';
 }
 
 export type Action = 
