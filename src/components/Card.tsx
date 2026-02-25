@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { GameCard } from '../types';
 
 interface CardProps {
@@ -25,13 +26,18 @@ export function Card({ card, isHidden, isSelected, isTargetable, onClick, classN
   
   if (isHidden || card.position === 'SET') {
     return (
-      <div 
+      <motion.div 
         onClick={onClick}
         draggable={draggable}
         onDragStart={onDragStart}
-        className={`${sizeClasses} bg-[#4a3b2c] border-[3px] border-[#2a1b0c] shadow-md bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] ${className} ${onClick || draggable ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
+        whileHover={onClick || draggable ? { scale: 1.05, y: -5 } : {}}
+        whileTap={onClick || draggable ? { scale: 0.95 } : {}}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+        className={`${sizeClasses} bg-[#4a3b2c] border-[3px] border-[#2a1b0c] shadow-md bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] ${className} ${onClick || draggable ? 'cursor-pointer' : ''}`}
         style={{
-          transform: card.position === 'SET' ? 'rotate(90deg)' : 'none'
+          rotate: card.position === 'SET' ? 90 : 0
         }}
       >
         <div className="w-full h-full border border-black/50 flex items-center justify-center">
@@ -39,7 +45,7 @@ export function Card({ card, isHidden, isSelected, isTargetable, onClick, classN
             <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border border-black/20 bg-black/10" />
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   }
   
@@ -47,13 +53,36 @@ export function Card({ card, isHidden, isSelected, isTargetable, onClick, classN
   const bgColor = isMonster ? 'bg-[#d4a373]' : 'bg-[#40916c]';
   
   return (
-    <div 
+    <motion.div 
       onClick={onClick}
       draggable={draggable}
       onDragStart={onDragStart}
-      className={`relative ${sizeClasses} ${bgColor} border-[3px] ${isSelected ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.8)]' : isTargetable ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)] cursor-crosshair' : 'border-[#5c4033]'} flex flex-col text-black ${onClick || draggable ? 'cursor-pointer hover:scale-105 transition-transform' : ''} ${className}`}
+      whileHover={onClick || draggable ? { scale: 1.05, y: -5, zIndex: 10 } : {}}
+      whileTap={onClick || draggable ? { scale: 0.95 } : {}}
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ 
+        opacity: 1, 
+        scale: isSelected ? 1.05 : 1,
+        y: isSelected ? -10 : 0,
+        boxShadow: isSelected 
+          ? '0 0 20px rgba(250,204,21,0.8)' 
+          : isTargetable 
+            ? '0 0 20px rgba(239,68,68,0.8)' 
+            : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+      }}
+      transition={{ 
+        type: 'spring', 
+        stiffness: 300, 
+        damping: 20,
+        boxShadow: {
+          repeat: isTargetable ? Infinity : 0,
+          repeatType: "reverse",
+          duration: 0.5
+        }
+      }}
+      className={`relative ${sizeClasses} ${bgColor} border-[3px] ${isSelected ? 'border-yellow-400 z-20' : isTargetable ? 'border-red-500 cursor-crosshair z-20' : 'border-[#5c4033]'} flex flex-col text-black ${onClick || draggable ? 'cursor-pointer' : ''} ${className}`}
       style={{
-        transform: card.position === 'DEFENSE' ? 'rotate(90deg)' : 'none'
+        rotate: card.position === 'DEFENSE' ? 90 : 0
       }}
     >
       {/* Card Name */}
@@ -93,6 +122,6 @@ export function Card({ card, isHidden, isSelected, isTargetable, onClick, classN
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
