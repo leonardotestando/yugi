@@ -12,7 +12,7 @@ export function createDeck(): GameCard[] {
   return deck;
 }
 
-export function createInitialState(): GameState {
+export function createInitialState(p1Name = 'Jogador 1', p2Name = 'Jogador 2'): GameState {
   const p1Deck = createDeck();
   const p2Deck = createDeck();
   
@@ -21,6 +21,7 @@ export function createInitialState(): GameState {
 
   return {
     player1: {
+      name: p1Name,
       lp: 8000,
       deck: p1Deck,
       hand: p1Hand,
@@ -30,6 +31,7 @@ export function createInitialState(): GameState {
       hasNormalSummoned: false,
     },
     player2: {
+      name: p2Name,
       lp: 8000,
       deck: p2Deck,
       hand: p2Hand,
@@ -41,8 +43,9 @@ export function createInitialState(): GameState {
     turn: 'player1',
     phase: 'DRAW',
     turnCount: 1,
-    log: ['Duelo começou! Turno do Jogador 1.', 'Jogador 1 entrou na fase DRAW.'],
+    log: [`Duelo começou! Turno de ${p1Name}.`, `${p1Name} entrou na fase DRAW.`],
     winner: null,
+    status: 'waiting',
   };
 }
 
