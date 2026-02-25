@@ -17,7 +17,8 @@ async function startServer() {
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    socket.on('join', (roomId: string) => {
+    socket.on('join', (data: { roomId: string, playerName: string }) => {
+      const { roomId, playerName } = data;
       socket.join(roomId);
       let room = rooms.get(roomId);
       
@@ -30,20 +31,25 @@ async function startServer() {
       if (!room.p1) {
         room.p1 = socket.id;
         role = 'player1';
+        room.state.player1.name = playerName || 'Jogador 1';
       } else if (!room.p2 && room.p1 !== socket.id) {
         room.p2 = socket.id;
         role = 'player2';
+        room.state.player2.name = playerName || 'Jogador 2';
+        room.state.status = 'playing';
       } else if (room.p1 === socket.id) {
         role = 'player1';
+        room.state.player1.name = playerName || 'Jogador 1';
       } else if (room.p2 === socket.id) {
         role = 'player2';
+        room.state.player2.name = playerName || 'Jogador 2';
       }
 
       socket.emit('role', role);
       io.to(roomId).emit('gameState', room.state);
 
       socket.on('action', (action: Action) => {
-        if (room) {
+        if (room && room.state.status === 'playing') {
           const isP1 = role === 'player1' && room.state.turn === 'player1';
           const isP2 = role === 'player2' && room.state.turn === 'player2';
           
@@ -56,8 +62,15 @@ async function startServer() {
 
       socket.on('disconnect', () => {
         if (room) {
-          if (room.p1 === socket.id) room.p1 = undefined;
-          if (room.p2 === socket.id) room.p2 = undefined;
+          if (room.p1 === socket.id) {
+            room.p1 = undefined;
+            room.state.status = 'waiting';
+          }
+          if (room.p2 === socket.id) {
+            room.p2 = undefined;
+            room.state.status = 'waiting';
+          }
+          io.to(roomId).emit('gameState', room.state);
         }
       });
     });
